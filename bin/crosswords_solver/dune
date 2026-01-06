@@ -1,0 +1,4 @@
+(library
+ (name crosswords_solver)
+ (modules crosswords_solver)
+)
