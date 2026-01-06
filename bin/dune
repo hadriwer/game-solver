@@ -1,0 +1,7 @@
+(executable
+ (public_name game_solver)
+ (name main)
+ (libraries game_solver sudoku_solver wordle_solver fubuki_solver)
+ (preprocess
+  (pps ppx_deriving.show))
+)

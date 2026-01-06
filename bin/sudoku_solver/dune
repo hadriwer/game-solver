@@ -1,0 +1,6 @@
+(library
+ (name sudoku_solver)
+ (modules sudoku_solver)
+ (preprocess
+  (pps ppx_deriving.show))
+)

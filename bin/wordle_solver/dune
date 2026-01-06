@@ -1,0 +1,4 @@
+(library
+ (name wordle_solver)
+ (modules wordle_solver)
+)

@@ -1,0 +1,7 @@
+(library
+ (name fubuki_solver)
+ (modules fubuki_solver)
+ (libraries sudoku_solver)
+ (preprocess
+  (pps ppx_deriving.show))
+)
