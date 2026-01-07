@@ -1,4 +1,6 @@
 (library
  (name crosswords_solver)
  (modules crosswords_solver)
+ (preprocess
+  (pps ppx_deriving.show))
 )

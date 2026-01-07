@@ -1,3 +1,4 @@
+type fmt = (string * (int * int) list) list [@@deriving show];;
 
 let get_pos_first str =
   ((str.[0] |> String.make 1 |> String.capitalize_ascii).[0]
@@ -58,7 +59,7 @@ let solve path =
     )
   in
   let in_bounds x y = 0 <= x && x < lenx && 0 <= y && y < leny in
-  let horizontal x y =
+  let direction x y dx dy =
     let rec aux x y acc_word acc = function      
       | l when in_bounds x y -> (
         let word = acc_word ^ (grid.(y).(x) |> String.lowercase_ascii) in
@@ -66,22 +67,27 @@ let solve path =
           | [hd] as nw -> 
               (* we find the word so we delete in the words list*)
               if hd = acc_word 
-              then (w := delete_word hd !w; acc)
+              then (w := delete_word hd !w; (hd, acc))
               else 
-                aux (x+1) y word ((x,y)::acc) nw
+                aux (x+dx) (y+dy) word ((x,y)::acc) nw
           | _ -> (
               let new_words = match_suffix word l in
-              aux (x+1) y word ((x,y)::acc) new_words
+              aux (x+dx) (y+dy) word ((x,y)::acc) new_words
           )
       )
       | [hd] -> 
           if hd = acc_word 
-          then (w := delete_word hd !w; acc)
-          else []
-      | _ -> []
+          then (w := delete_word hd !w; (hd, acc))
+          else ("", [])
+      | _ -> ("", [])
     in
     aux x y "" [] !w
-  in 
+  in
+  let all_direction x y =
+    [(1, 0); (1, 1); (1, -1); (0, 1); (0, -1); (-1, 0); (-1, 1); (-1, -1)]
+    |> List.map (fun (dx, dy) -> direction x y dx dy)
+    |> List.filter ((<>) ("", []))
+  in
   let coloration = Array.make_matrix leny lenx false in
   let coord = ref [] in
   Array.iteri (fun i row ->
@@ -89,7 +95,14 @@ let solve path =
       let curr = grid.(i).(j) in
       let first = get_pos_first curr in
       if visited.(first) && !w <> []
-      then (coord := horizontal j i @ !coord)
+      then (
+        let res = all_direction j i in
+        match res with
+          | [] -> ()
+          | _ -> print_endline (show_fmt res);
+        let all_coord = List.fold_left (fun r (_,l) -> l @ r) [] res in
+        coord := all_coord @ !coord
+      )
     ) row
   ) grid;
   List.iter (fun (i,j) -> coloration.(j).(i) <- true) !coord;
