@@ -114,3 +114,38 @@ Is equivalent to solve :
 20  12  13
 ```
 with '?' in the domain [1, 3, 5, 7, 8, 9]. **It can be use once**.
+
+### Crosswords
+
+```
+Crosswords_solver.solve path; (* in main.ml *)
+```
+
+**Instance in files/crosswords.txt**
+```
+47                              # number of words
+absolu                          # word n°1
+...                             # all the other words
+vertige                         # word n°47
+14 18                           # size of the grid x y
+N I H C A M N I D N A V A L
+O C I R O C O C I D N E F E
+S E R E U G N A R A H N S L
+E L I T U A N E C N E T T A
+X U E L U G N A E E T I U N
+A C S E A O N M T T C N P C
+P I L T L M U I A I A K E I
+P L I I A R O E L I O B F N
+E L N L E J U N N R N N A A
+A E G C R N H E A E A A I N
+L P V O O A T U L M R C T T
+E C A R L A T E D U G V R E
+E M R E F N E R L S O E E B
+E N I T E R O O E E S R N R
+T N A E N C S B E R E T N I
+E E N H E B I A B P I I A E
+L L T R A L C A L I N G C T
+T N E M E G U J A U G E S E
+```
+
+Return the exact location of each words and a graphic representation. The graphic representation can be unreadable due to color.
