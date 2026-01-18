@@ -1,0 +1,5 @@
+(library
+ (name cemantix_solver)
+ (libraries owl)
+ (modules cemantix_solver)
+)
