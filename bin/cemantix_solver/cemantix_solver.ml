@@ -1,6 +1,5 @@
-(* open Owl_nlp_tfidf *)
-
 open Owl
+
 
 let read_instance filename =
   let ic = open_in filename in

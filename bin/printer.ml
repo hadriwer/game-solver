@@ -6,3 +6,9 @@ let choose_solver () =
 let choose_lang () =
   print_endline "Choose lang :\n<1> english\n<2> french\n"
 ;;
+
+let rec sep chr n =
+  if n <= 0 then print_newline ()
+  else
+    (print_char chr; sep chr (n-1))
+;;
