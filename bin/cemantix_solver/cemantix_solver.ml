@@ -1,5 +1,10 @@
 open Owl
+let number_words = 1152450.;;
 
+type attempt = {
+  idx : int;
+  score : float;
+};;
 
 let read_instance filename =
   let ic = open_in filename in
@@ -33,7 +38,11 @@ let read_instance filename =
       ) values;
       
       incr row;
-      if !row mod 10000 = 0 then Printf.printf "Chargés : %d mots...\n%!" !row;
+      if !row mod 10000 = 0 
+      then (
+        Printf.printf "\027[A\027[2K\r %f %% words loaded...\n" ((!row |> float_of_int) /. number_words *. 100.);
+        flush stdout
+      )
     done;
     close_in ic;
     names, matrix
@@ -45,9 +54,95 @@ let read_instance filename =
     final_names, final_matrix
 ;;
 
-let solve () =
-  let names, _ = read_instance "bin/cemantix_solver/wiki.fr.vec" in
+let normalize v =
+  let inf = Owl_linalg.Generic.norm v in
+  if inf = 0. then v
+  else
+    Owl_dense_matrix.Operator.(v /$ (Owl_linalg.Generic.norm v))
+;;
 
-  for i = 0 to 10 do
-    Printf.printf "%s\n" names.(i);
+let normalize_all rows cols m =
+  print_endline "we normalise all the words";
+  for i = 0 to rows - 1 do
+    let v = Owl_dense_matrix.Generic.row m i in
+    let nv = normalize v in
+    for j = 0 to cols - 1 do
+      Owl_dense_matrix.Generic.set m i j (Owl_dense_matrix.Generic.get nv 0 j);
+    done;
+  done
+;;
+
+let estimate_direction cols embeddings attempts =
+  let v_dir = Dense.Matrix.S.zeros 1 cols in
+
+  let mean_score =
+    List.fold_left (fun acc a -> acc +. a.score) 0. attempts
+    /. float_of_int (List.length attempts)
+  in
+
+  List.iter (fun a ->
+    let v = Owl_dense_matrix.Generic.row embeddings a.idx in
+    let w = a.score -. mean_score in
+    let tmp = Dense.Matrix.S.(v *$ w) in
+    Dense.Matrix.S.(v_dir += tmp);
+  ) attempts;
+
+  normalize v_dir
+;;
+
+let find_best_neigh rows tbl m v =
+  let best = ref (-1, neg_infinity) in
+
+  for i = 0 to rows - 1 do
+    if not (Hashtbl.mem tbl i) then (
+      let v' = Owl_dense_matrix.Generic.row m i in
+      let score = Owl_dense_matrix.Generic.(get (dot v' (transpose v)) 0 0) in
+      if score > snd !best then
+        best := (i, score)
+    )
   done;
+  let res = fst !best in
+  if res = -1 then failwith "error find_best_voisin : find no close neigh."
+  else res
+;;
+
+let solve () =
+  Random.self_init ();
+  let names, embeddings = read_instance "bin/cemantix_solver/wiki.fr.vec" in
+  let rows = Owl_dense_matrix.Generic.row_num embeddings in
+  let cols = Owl_dense_matrix.Generic.col_num embeddings in
+  normalize_all rows cols embeddings;
+
+  let tf = ref true in
+  let tbl = Hashtbl.create 1000 in
+  let attemps = ref [] in
+
+  let choice = ref (Random.int_in_range ~min:0 ~max:(rows-1)) in
+  let guess = ref (names.(!choice)) in
+
+  while !tf do
+    Printf.printf "Guess by the solver : %s\n" !guess;
+    Printf.printf "Cemantix output = ";
+
+    let score = read_float () in
+
+    Hashtbl.add tbl !choice true;
+    if score > 0. then (
+      attemps := {idx = !choice; score} :: !attemps
+    );
+
+    (if score = 1000.
+    then tf := false
+    else
+      if List.length !attemps >= 2 then (
+        print_endline "we estimate the direction";
+        let v = estimate_direction cols embeddings !attemps in
+        choice := find_best_neigh rows tbl embeddings v;
+        Printf.printf "choice = %d\n" !choice;
+      )
+      else
+        choice := Random.int_in_range ~min:0 ~max:(rows-1));
+    guess := names.(!choice);
+  done;
+
+  Printf.printf "Word was : %s\n" !guess;
