@@ -1,5 +1,5 @@
 open Owl
-let number_words = 1152450.;;
+let number_words = 80559.;;
 
 type attempt = {
   idx : int;
@@ -72,22 +72,27 @@ let normalize_all rows cols m =
   done
 ;;
 
-let estimate_direction cols embeddings attempts =
+let estimate_direction ?(alpha=2.) cols embeddings attempts =
   let v_dir = Dense.Matrix.S.zeros 1 cols in
 
-  let mean_score =
+  (* let mean_score =
     List.fold_left (fun acc a -> acc +. a.score) 0. attempts
     /. float_of_int (List.length attempts)
-  in
+  in *)
 
   List.iter (fun a ->
     let v = Owl_dense_matrix.Generic.row embeddings a.idx in
-    let w = a.score -. mean_score in
+    let w = (a.score /. 100.) ** alpha in
     let tmp = Dense.Matrix.S.(v *$ w) in
     Dense.Matrix.S.(v_dir += tmp);
   ) attempts;
 
   normalize v_dir
+;;
+
+let score_candidate v' v = 
+  let s = Owl_dense_matrix.Generic.(get (dot v' (transpose v)) 0 0) in
+  s ** 3.
 ;;
 
 let find_best_neigh rows tbl m v =
@@ -96,7 +101,7 @@ let find_best_neigh rows tbl m v =
   for i = 0 to rows - 1 do
     if not (Hashtbl.mem tbl i) then (
       let v' = Owl_dense_matrix.Generic.row m i in
-      let score = Owl_dense_matrix.Generic.(get (dot v' (transpose v)) 0 0) in
+      let score = score_candidate v' v in
       if score > snd !best then
         best := (i, score)
     )
@@ -106,9 +111,32 @@ let find_best_neigh rows tbl m v =
   else res
 ;;
 
+let add_list ?(taille=10) l elt =
+  let rec aux e acc = function
+    | [] -> e :: List.rev acc
+    | hd::tl as xs -> if hd.score > e.score then (List.rev acc) @ (e :: xs) else aux e (hd::acc) tl
+  in
+  if List.length l = taille
+  then (
+    let hd = List.hd l in
+    if hd.score > elt.score 
+    then l
+    else aux elt [] (List.tl l)
+  ) else aux elt [] l
+;;
+
+let too_close ?(max_diff=10.) q =
+  if Queue.is_empty q
+  then false
+  else
+    let min_val = Queue.fold min max_float q in
+    let max_val = Queue.fold max min_float q in
+    (max_val -. min_val) <= max_diff
+;;
+
 let solve () =
   Random.self_init ();
-  let names, embeddings = read_instance "bin/cemantix_solver/wiki.fr.vec" in
+  let names, embeddings = read_instance "bin/cemantix_solver/wiki.fr.filtered.vec" in
   let rows = Owl_dense_matrix.Generic.row_num embeddings in
   let cols = Owl_dense_matrix.Generic.col_num embeddings in
   normalize_all rows cols embeddings;
@@ -116,33 +144,46 @@ let solve () =
   let tf = ref true in
   let tbl = Hashtbl.create 1000 in
   let attemps = ref [] in
-
   let choice = ref (Random.int_in_range ~min:0 ~max:(rows-1)) in
   let guess = ref (names.(!choice)) in
 
+  let latest_score = Queue.create () in
+  let tour = ref 0 in
+
   while !tf do
+    incr tour;
     Printf.printf "Guess by the solver : %s\n" !guess;
     Printf.printf "Cemantix output = ";
 
-    let score = read_float () in
+    let rec get_score () = try read_float () with Failure _ -> (Printf.printf "Input must be a float / int : "; get_score ()) in
+    let score = get_score () in
 
     Hashtbl.add tbl !choice true;
     if score > 0. then (
-      attemps := {idx = !choice; score} :: !attemps
+      attemps := add_list !attemps {idx = !choice; score}
     );
+
+    (* To escape from local minima *)
+    Queue.add score latest_score;
+
+    Printf.printf "Liste length = %d\n" (List.length !attemps);
 
     (if score = 1000.
     then tf := false
     else
-      if List.length !attemps >= 2 then (
+      if List.length !attemps >= 1 && not (!tour mod 3 = 0 && (too_close latest_score)) then (
         print_endline "we estimate the direction";
         let v = estimate_direction cols embeddings !attemps in
         choice := find_best_neigh rows tbl embeddings v;
         Printf.printf "choice = %d\n" !choice;
       )
-      else
-        choice := Random.int_in_range ~min:0 ~max:(rows-1));
+      else (
+        print_endline "we choose a random word.";
+        choice := Random.int_in_range ~min:0 ~max:(rows-1);
+        if (!tour mod 3 = 0) then let _ = Queue.take latest_score in ()
+      ));
     guess := names.(!choice);
+    print_newline ();
   done;
 
-  Printf.printf "Word was : %s\n" !guess;
+  Printf.printf "Word was : %s in %d tours.\n" !guess !tour;

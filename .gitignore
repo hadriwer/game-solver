@@ -1,4 +1,4 @@
 _build
 
 *.txt
-bin/cemantix_solver/wiki.fr.vec
+*.vec
